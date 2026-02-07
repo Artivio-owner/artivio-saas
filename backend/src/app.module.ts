@@ -1,62 +1,51 @@
 /**
  * ============================================
- * ARTIVIO BACKEND — ROOT MODULE
+ * ARTIVIO — APP MODULE
  * File: app.module.ts
  * ============================================
  */
 
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
 
 import { PrismaModule } from './prisma/prisma.module';
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { CompaniesModule } from './companies/companies.module';
 
-import { RolesGuard } from './auth/guards/roles.guard';
+import { AuthModule } from './auth/auth.module';
+import { ClientsModule } from './clients/clients.module';
+import { EmployeesModule } from './employees/employees.module';
+import { AccountingModule } from './accounting/accounting.module';
+
+/**
+ * В будущем будут добавлены:
+ * - OrdersModule
+ * - ProductsModule
+ * - ProductionModule
+ * - SupportModule
+ * - SaaS / BillingModule
+ */
 
 @Module({
   imports: [
-    /**
-     * --------------------------------------------
-     * CONFIG
-     * --------------------------------------------
-     * Loads .env
-     * Global access to process.env
-     */
-    ConfigModule.forRoot({
-      isGlobal: true,
-    }),
-
-    /**
-     * --------------------------------------------
-     * DATABASE (PRISMA)
-     * --------------------------------------------
-     */
     PrismaModule,
 
     /**
-     * --------------------------------------------
-     * CORE MODULES
-     * --------------------------------------------
+     * Авторизация и роли
      */
     AuthModule,
-    UsersModule,
-    CompaniesModule,
-  ],
 
-  providers: [
     /**
-     * --------------------------------------------
-     * GLOBAL GUARDS
-     * --------------------------------------------
-     * Role-based access control
+     * CRM
      */
-    {
-      provide: APP_GUARD,
-      useClass: RolesGuard,
-    },
+    ClientsModule,
+
+    /**
+     * Сотрудники и производство
+     */
+    EmployeesModule,
+
+    /**
+     * Финансы и аналитика
+     */
+    AccountingModule,
   ],
 })
 export class AppModule {}
