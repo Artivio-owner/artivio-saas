@@ -5,117 +5,107 @@
  * ============================================
  */
 
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { UserRole } from '../auth/guards/roles.guard';
+import { MaterialsService } from '../materials/materials.service';
 
 export enum OrderStatus {
-  NEW = 'new',
-  IN_PROCESS = 'in_process',
-  ACCEPTED = 'accepted',
-  IN_PRODUCTION = 'in_production',
-  PAINTING = 'painting',
-  DRYING = 'drying',
-  PRODUCED = 'produced',
-  PARTIALLY_PRODUCED = 'partially_produced',
-  WAITING_FOR_SHIPMENT = 'waiting_for_shipment',
-  WAITING_FOR_PICKUP = 'waiting_for_pickup',
-  SHIPPED = 'shipped',
-  COMPLETED = 'completed',
+  PROCESSING = 'PROCESSING',               // в обработке
+  ACCEPTED = 'ACCEPTED',                   // принят
+  IN_PRODUCTION = 'IN_PRODUCTION',         // в процессе изготовления
+
+  CUTTING = 'CUTTING',                     // распил
+  MILLING = 'MILLING',                     // фрезеровка
+  VENEERING = 'VENEERING',                 // шпонирование
+  PAINTING = 'PAINTING',                   // малярка
+  DRYING = 'DRYING',                       // сушка
+  PACKAGING = 'PACKAGING',                 // упаковка
+
+  MANUFACTURED = 'MANUFACTURED',           // изготовлен
+  WAITING_SHIPMENT = 'WAITING_SHIPMENT',   // ожидает отправки
+  WAITING_PICKUP = 'WAITING_PICKUP',       // ожидает получения
+  COMPLETED = 'COMPLETED',                 // завершен
+
+  PARTIALLY_MANUFACTURED = 'PARTIALLY_MANUFACTURED',
 }
 
 @Injectable()
 export class OrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private materialsService: MaterialsService,
+  ) {}
 
   /**
    * --------------------------------------------
-   * LIST ORDERS BY COMPANY
+   * CREATE ORDER (SITE / ADMIN)
    * --------------------------------------------
    */
-  async listOrders(companyId: string) {
-    return this.prisma.order.findMany({
-      where: { companyId },
-      include: {
-        items: true,
-        client: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  /**
-   * --------------------------------------------
-   * CREATE ORDER (SITE OR ADMIN)
-   * --------------------------------------------
-   */
-  async createOrder(data: {
-    companyId: string;
+  async createOrder(companyId: string, data: {
     clientId: string;
-    items: any[];
-    isVip?: boolean;
-    createdByRole?: UserRole;
+    items: { productId: string; quantity: number; vip?: boolean }[];
+    deliveryType: 'DELIVERY' | 'PICKUP';
+    comment?: string;
   }) {
-    const baseDays = 10;
-    let extraDays = 0;
-
-    const now = new Date();
-    const hour = now.getHours();
-    const day = now.getDay(); // 0 = Sun, 6 = Sat
-
-    // после 16:00 — перенос
-    if (hour >= 16) extraDays += 1;
-
-    // выходные — перенос на понедельник
-    if (day === 0) extraDays += 1;
-    if (day === 6) extraDays += 2;
-
-    // VIP уменьшает срок
-    if (data.isVip) extraDays -= 2;
-
-    const productionDays = Math.max(baseDays + extraDays, 1);
-
     return this.prisma.order.create({
       data: {
-        companyId: data.companyId,
+        companyId,
         clientId: data.clientId,
-        status: OrderStatus.IN_PROCESS,
-        isVip: !!data.isVip,
-        productionDays,
+        status: OrderStatus.PROCESSING,
+        deliveryType: data.deliveryType,
+        comment: data.comment,
         items: {
-          create: data.items.map((item) => ({
-            productId: item.productId,
-            quantity: item.quantity,
-            status: OrderStatus.NEW,
+          create: data.items.map(i => ({
+            productId: i.productId,
+            quantity: i.quantity,
+            isVip: i.vip ?? false,
+            status: OrderStatus.PROCESSING,
           })),
         },
       },
+      include: { items: true },
     });
   }
 
   /**
    * --------------------------------------------
    * ACCEPT ORDER
+   * - списываем материалы
+   * - рассчитываем сроки
    * --------------------------------------------
-   * Manual admin action
    */
-  async acceptOrder(
-    orderId: string,
-    companyId: string,
-    productionDays?: number,
-  ) {
+  async acceptOrder(orderId: string, companyId: string) {
     const order = await this.prisma.order.findFirst({
       where: { id: orderId, companyId },
+      include: {
+        items: {
+          include: {
+            product: {
+              include: { materials: true },
+            },
+          },
+        },
+      },
     });
 
-    if (!order) throw new ForbiddenException();
+    if (!order) throw new BadRequestException('Order not found');
+
+    // списание материалов
+    for (const item of order.items) {
+      for (const material of item.product.materials) {
+        await this.materialsService.updateStock(
+          material.materialId,
+          companyId,
+          -material.avgConsumption * item.quantity,
+        );
+      }
+    }
 
     return this.prisma.order.update({
       where: { id: orderId },
       data: {
         status: OrderStatus.ACCEPTED,
-        productionDays:
-          productionDays ?? order.productionDays,
+        acceptedAt: new Date(),
       },
     });
   }
@@ -126,59 +116,43 @@ export class OrdersService {
    * --------------------------------------------
    */
   async updateItemStatus(
-    itemId: string,
+    orderItemId: string,
     status: OrderStatus,
-    companyId: string,
   ) {
-    const item = await this.prisma.orderItem.findFirst({
-      where: {
-        id: itemId,
-        order: { companyId },
-      },
-      include: { order: true },
-    });
-
-    if (!item) throw new ForbiddenException();
-
     await this.prisma.orderItem.update({
-      where: { id: itemId },
+      where: { id: orderItemId },
       data: { status },
     });
 
-    // Проверяем общий статус заказа
-    const items = await this.prisma.orderItem.findMany({
-      where: { orderId: item.orderId },
-    });
-
-    const produced = items.filter(
-      (i) => i.status === OrderStatus.PRODUCED,
-    );
-
-    let orderStatus = OrderStatus.IN_PRODUCTION;
-
-    if (produced.length === items.length) {
-      orderStatus = OrderStatus.PRODUCED;
-    } else if (produced.length > 0) {
-      orderStatus = OrderStatus.PARTIALLY_PRODUCED;
-    }
-
-    await this.prisma.order.update({
-      where: { id: item.orderId },
-      data: { status: orderStatus },
-    });
-
-    return true;
+    return this.recalculateOrderStatus(orderItemId);
   }
 
   /**
    * --------------------------------------------
-   * MARK ORDER AS COMPLETED
+   * RECALCULATE ORDER STATUS
    * --------------------------------------------
    */
-  async completeOrder(orderId: string, companyId: string) {
-    return this.prisma.order.updateMany({
-      where: { id: orderId, companyId },
-      data: { status: OrderStatus.COMPLETED },
+  private async recalculateOrderStatus(orderItemId: string) {
+    const item = await this.prisma.orderItem.findUnique({
+      where: { id: orderItemId },
+      include: { order: { include: { items: true } } },
+    });
+
+    const statuses = item.order.items.map(i => i.status);
+
+    let newStatus = OrderStatus.IN_PRODUCTION;
+
+    if (statuses.every(s => s === OrderStatus.MANUFACTURED)) {
+      newStatus = OrderStatus.MANUFACTURED;
+    }
+
+    if (statuses.some(s => s === OrderStatus.MANUFACTURED)) {
+      newStatus = OrderStatus.PARTIALLY_MANUFACTURED;
+    }
+
+    await this.prisma.order.update({
+      where: { id: item.orderId },
+      data: { status: newStatus },
     });
   }
 }

@@ -7,84 +7,38 @@
 
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-/**
- * --------------------------------------------
- * MATERIAL STATUS
- * --------------------------------------------
- */
-export enum MaterialStatus {
-  IN_STOCK = 'IN_STOCK',
-  ON_ORDER = 'ON_ORDER',
-  OUT_OF_STOCK = 'OUT_OF_STOCK',
-}
-
-/**
- * --------------------------------------------
- * PRODUCT LABELS (MARKETPLACE STYLE)
- * --------------------------------------------
- */
-export enum ProductLabel {
-  NEW = 'NEW',
-  HIT = 'HIT',
-  SALE = 'SALE',
-  VIP = 'VIP',
-  LIMITED = 'LIMITED',
-}
+import { MaterialsService } from '../materials/materials.service';
 
 @Injectable()
 export class ProductsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly materialsService: MaterialsService,
+  ) {}
 
   /**
-   * --------------------------------------------
-   * LIST PRODUCTS (SITE / ADMIN)
-   * --------------------------------------------
+   * Создание товара
+   * Используется:
+   * - в админке
+   * - при ручном добавлении
    */
-  async list(companyId: string) {
-    return this.prisma.product.findMany({
-      where: { companyId },
-      include: {
-        materials: true,
-        labels: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
-
-  /**
-   * --------------------------------------------
-   * GET SINGLE PRODUCT
-   * --------------------------------------------
-   */
-  async getById(id: string, companyId: string) {
-    const product = await this.prisma.product.findFirst({
-      where: { id, companyId },
-      include: {
-        materials: true,
-        labels: true,
-      },
-    });
-
-    if (!product) {
-      throw new NotFoundException('Product not found');
-    }
-
-    return product;
-  }
-
-  /**
-   * --------------------------------------------
-   * CREATE PRODUCT (ADMIN)
-   * --------------------------------------------
-   */
-  async create(companyId: string, data: {
+  async createProduct(companyId: string, data: {
     name: string;
     description?: string;
     price: number;
-    costPrice: number;
-    baseProductionDays: number;
-    labels?: ProductLabel[];
+    costPrice: number; // себестоимость
+    isVipAvailable?: boolean;
+    productionFlags?: {
+      cutting?: boolean;
+      milling?: boolean;
+      veneering?: boolean;
+      painting?: boolean;
+    };
+    materials?: {
+      materialId: string;
+      avgConsumption: number;
+    }[];
+    badges?: string[];
   }) {
     return this.prisma.product.create({
       data: {
@@ -93,116 +47,134 @@ export class ProductsService {
         description: data.description,
         price: data.price,
         costPrice: data.costPrice,
-        baseProductionDays: data.baseProductionDays,
-        labels: {
-          create: data.labels?.map(label => ({ label })) || [],
+        isVipAvailable: data.isVipAvailable ?? false,
+        cutting: data.productionFlags?.cutting ?? true,
+        milling: data.productionFlags?.milling ?? false,
+        veneering: data.productionFlags?.veneering ?? false,
+        painting: data.productionFlags?.painting ?? false,
+        badges: data.badges ?? [],
+        materials: {
+          create: data.materials?.map(m => ({
+            materialId: m.materialId,
+            avgConsumption: m.avgConsumption,
+          })) ?? [],
         },
       },
     });
   }
 
   /**
-   * --------------------------------------------
-   * UPDATE PRODUCT
-   * --------------------------------------------
+   * Получение всех товаров компании
    */
-  async update(
-    id: string,
+  async getProducts(companyId: string) {
+    return this.prisma.product.findMany({
+      where: { companyId },
+      include: {
+        materials: {
+          include: {
+            material: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Получение товара по ID
+   */
+  async getProductById(companyId: string, productId: string) {
+    const product = await this.prisma.product.findFirst({
+      where: {
+        id: productId,
+        companyId,
+      },
+      include: {
+        materials: {
+          include: {
+            material: true,
+          },
+        },
+      },
+    });
+
+    if (!product) {
+      throw new NotFoundException('Товар не найден');
+    }
+
+    return product;
+  }
+
+  /**
+   * Обновление товара
+   */
+  async updateProduct(
     companyId: string,
+    productId: string,
     data: Partial<{
       name: string;
       description: string;
       price: number;
       costPrice: number;
-      baseProductionDays: number;
+      isVipAvailable: boolean;
+      badges: string[];
     }>,
   ) {
-    return this.prisma.product.update({
-      where: { id },
+    return this.prisma.product.updateMany({
+      where: {
+        id: productId,
+        companyId,
+      },
       data,
     });
   }
 
   /**
-   * --------------------------------------------
-   * SET PRODUCT LABELS
-   * --------------------------------------------
+   * Списание материалов при ПРИНЯТИИ заказа
+   * Вызывается из OrdersService
    */
-  async setLabels(
-    productId: string,
+  async writeOffMaterialsForProduct(
     companyId: string,
-    labels: ProductLabel[],
-  ) {
-    await this.prisma.productLabel.deleteMany({
-      where: { productId },
-    });
-
-    return this.prisma.productLabel.createMany({
-      data: labels.map(label => ({
-        productId,
-        label,
-      })),
-    });
-  }
-
-  /**
-   * --------------------------------------------
-   * ADD / UPDATE MATERIAL
-   * --------------------------------------------
-   */
-  async upsertMaterial(
     productId: string,
-    companyId: string,
-    data: {
-      name: string;
-      status: MaterialStatus;
-      extraDays: number;
-      avgConsumption: number;
-    },
+    quantity: number,
   ) {
-    return this.prisma.productMaterial.upsert({
+    const productMaterials = await this.prisma.productMaterial.findMany({
       where: {
-        productId_name: {
-          productId,
-          name: data.name,
-        },
-      },
-      update: {
-        status: data.status,
-        extraDays: data.extraDays,
-        avgConsumption: data.avgConsumption,
-      },
-      create: {
         productId,
-        name: data.name,
-        status: data.status,
-        extraDays: data.extraDays,
-        avgConsumption: data.avgConsumption,
+        product: { companyId },
       },
     });
+
+    for (const pm of productMaterials) {
+      const totalConsumption = pm.avgConsumption * quantity;
+
+      await this.materialsService.writeOffMaterial(
+        companyId,
+        pm.materialId,
+        totalConsumption,
+      );
+    }
   }
 
   /**
-   * --------------------------------------------
-   * CALCULATE TOTAL PRODUCTION DAYS
-   * --------------------------------------------
+   * Расчёт прибыли по товару
    */
-  async calculateProductionDays(productId: string): Promise<number> {
-    const product = await this.prisma.product.findUnique({
-      where: { id: productId },
-      include: { materials: true },
-    });
+  calculateProfit(price: number, costPrice: number): number {
+    return price - costPrice;
+  }
 
-    if (!product) return 0;
+  /**
+   * Расчёт выплаты мастеру
+   * 5% от себестоимости * кол-во изделий
+   */
+  calculateMasterReward(costPrice: number, quantity: number): number {
+    return costPrice * 0.05 * quantity;
+  }
 
-    const materialsExtra = product.materials.reduce(
-      (sum, m) =>
-        m.status === MaterialStatus.ON_ORDER
-          ? sum + m.extraDays
-          : sum,
-      0,
-    );
-
-    return product.baseProductionDays + materialsExtra;
+  /**
+   * Проверка, является ли товар VIP
+   */
+  isVipProduct(product: any): boolean {
+    return Boolean(product.isVipAvailable);
   }
 }

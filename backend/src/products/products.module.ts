@@ -11,11 +11,15 @@ import { ProductsService } from './products.service';
 import { ProductsController } from './products.controller';
 
 import { PrismaModule } from '../prisma/prisma.module';
+import { MaterialsModule } from '../materials/materials.module';
 
 @Module({
-  imports: [PrismaModule],
-  controllers: [ProductsController],
+  imports: [
+    PrismaModule,
+    MaterialsModule, // связь товаров и склада
+  ],
   providers: [ProductsService],
+  controllers: [ProductsController],
   exports: [ProductsService],
 })
 export class ProductsModule {}
