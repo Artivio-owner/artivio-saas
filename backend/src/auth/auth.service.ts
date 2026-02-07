@@ -5,129 +5,192 @@
  * ============================================
  */
 
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 
 import { PrismaService } from '../prisma/prisma.service';
-import { UsersService } from '../users/users.service';
+import { EmployeeRole } from '../employees/employees.service';
 
-interface JwtPayload {
-  userId: string;
-  companyId: string;
-  role: string;
+/**
+ * Тип пользователя в системе
+ */
+export enum AuthUserType {
+  EMPLOYEE = 'employee',
+  CLIENT = 'client',
+  SUPER_ADMIN = 'super_admin',
 }
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly usersService: UsersService,
     private readonly jwtService: JwtService,
   ) {}
 
   /**
-   * --------------------------------------------
-   * LOGIN BY EMAIL + PASSWORD
-   * --------------------------------------------
+   * ============================================
+   * ЛОГИН (УНИВЕРСАЛЬНЫЙ)
+   * ============================================
+   * Поддерживает:
+   * - сотрудников
+   * - клиентов
+   * - глобального администратора
    */
-  async loginWithEmail(email: string, password: string) {
-    const user = await this.usersService.findByEmail(email);
+  async login(email: string, password: string) {
+    /**
+     * 1. Проверяем супер-админа (net_buzz)
+     * Он не принадлежит ни одной компании
+     */
+    if (email === process.env.SUPER_ADMIN_EMAIL) {
+      if (password !== process.env.SUPER_ADMIN_PASSWORD) {
+        throw new UnauthorizedException('Неверные данные');
+      }
 
-    if (!user || !user.passwordHash) {
-      throw new UnauthorizedException('Invalid credentials');
+      return this.generateToken({
+        id: 'net_buzz',
+        role: 'SUPER_ADMIN',
+        type: AuthUserType.SUPER_ADMIN,
+      });
     }
 
-    const isValid = await bcrypt.compare(password, user.passwordHash);
-    if (!isValid) {
-      throw new UnauthorizedException('Invalid credentials');
+    /**
+     * 2. Проверяем сотрудников
+     */
+    const employee = await this.prisma.employee.findFirst({
+      where: { email },
+    });
+
+    if (employee) {
+      const valid = await bcrypt.compare(
+        password,
+        employee.passwordHash,
+      );
+
+      if (!valid) {
+        throw new UnauthorizedException('Неверные данные');
+      }
+
+      return this.generateToken({
+        id: employee.id,
+        role: employee.role,
+        type: AuthUserType.EMPLOYEE,
+        companyId: employee.companyId,
+      });
     }
 
-    return this.buildAuthResponse(user);
+    /**
+     * 3. Проверяем клиентов
+     */
+    const client = await this.prisma.client.findFirst({
+      where: { email },
+    });
+
+    if (client) {
+      const valid = await bcrypt.compare(
+        password,
+        client.passwordHash,
+      );
+
+      if (!valid) {
+        throw new UnauthorizedException('Неверные данные');
+      }
+
+      return this.generateToken({
+        id: client.id,
+        role: 'CLIENT',
+        type: AuthUserType.CLIENT,
+        companyId: client.companyId,
+      });
+    }
+
+    throw new UnauthorizedException('Пользователь не найден');
   }
 
   /**
-   * --------------------------------------------
-   * PREPARE LOGIN BY PHONE (SMS)
-   * --------------------------------------------
-   * Реальная отправка SMS будет подключена позже
-   * через smsc.ru / smsgorod.ru
+   * ============================================
+   * РЕГИСТРАЦИЯ СОТРУДНИКА
+   * ============================================
+   * Используется администратором компании
    */
-  async requestSmsCode(phone: string) {
-    // Проверяем пользователя
-    const user = await this.prisma.user.findUnique({
-      where: { phone },
-    });
+  async registerEmployee(data: {
+    companyId: string;
+    email: string;
+    password: string;
+    name: string;
+    role: EmployeeRole;
+  }) {
+    const passwordHash = await bcrypt.hash(data.password, 10);
 
-    if (!user) {
-      throw new UnauthorizedException('User not found');
-    }
-
-    // Генерируем код (заглушка, позже подключим сервис)
-    const code = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Сохраняем код (упрощённо)
-    await this.prisma.smsCode.create({
+    return this.prisma.employee.create({
       data: {
-        userId: user.id,
-        code,
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000), // 5 минут
+        companyId: data.companyId,
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        passwordHash,
+        isActive: true,
       },
     });
-
-    return { success: true };
   }
 
   /**
-   * --------------------------------------------
-   * CONFIRM SMS CODE
-   * --------------------------------------------
+   * ============================================
+   * РЕГИСТРАЦИЯ КЛИЕНТА
+   * ============================================
+   * Используется сайтом и админкой
    */
-  async confirmSmsCode(phone: string, code: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { phone },
-    });
+  async registerClient(data: {
+    companyId: string;
+    email: string;
+    password: string;
+    name: string;
+  }) {
+    const passwordHash = await bcrypt.hash(data.password, 10);
 
-    if (!user) {
-      throw new UnauthorizedException('Invalid code');
-    }
-
-    const record = await this.prisma.smsCode.findFirst({
-      where: {
-        userId: user.id,
-        code,
-        expiresAt: { gt: new Date() },
+    return this.prisma.client.create({
+      data: {
+        companyId: data.companyId,
+        email: data.email,
+        name: data.name,
+        passwordHash,
       },
     });
-
-    if (!record) {
-      throw new UnauthorizedException('Invalid or expired code');
-    }
-
-    return this.buildAuthResponse(user);
   }
 
   /**
-   * --------------------------------------------
-   * JWT GENERATION
-   * --------------------------------------------
+   * ============================================
+   * ГЕНЕРАЦИЯ JWT
+   * ============================================
    */
-  private buildAuthResponse(user: any) {
-    const payload: JwtPayload = {
-      userId: user.id,
-      companyId: user.companyId,
-      role: user.role,
-    };
-
+  private generateToken(payload: {
+    id: string;
+    role: string;
+    type: AuthUserType;
+    companyId?: string;
+  }) {
     return {
       accessToken: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        email: user.email,
-        phone: user.phone,
-        role: user.role,
-        companyId: user.companyId,
-      },
     };
+  }
+
+  /**
+   * ============================================
+   * ПРОВЕРКА ДОСТУПА К КОМПАНИИ
+   * ============================================
+   * SUPER_ADMIN видит всё, но не отображается
+   */
+  canAccessCompany(
+    user: any,
+    companyId: string,
+  ): boolean {
+    if (user.type === AuthUserType.SUPER_ADMIN) {
+      return true;
+    }
+
+    return user.companyId === companyId;
   }
 }
