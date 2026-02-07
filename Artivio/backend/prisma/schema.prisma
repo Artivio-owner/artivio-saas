@@ -1,0 +1,263 @@
+// ================================
+// PRISMA SCHEMA — ARTIVIO PLATFORM
+// ================================
+// PostgreSQL
+// Multi-tenant SaaS (DB per company)
+// Author: Senior Architect
+// ================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ================================
+// ENUMS
+// ================================
+
+enum UserRole {
+  SUPER_ADMIN      // net_buzz (видит все компании)
+  COMPANY_ADMIN
+  MANAGER
+  MASTER
+  MAIN_MASTER
+  INTERN
+  CLIENT
+}
+
+enum OrderStatus {
+  PENDING                // в обработке (до принятия)
+  ACCEPTED               // принят
+  IN_PRODUCTION          // в процессе изготовления
+  CUTTING                // распил
+  MILLING                // фрезеровка
+  VENEERING              // шпонирование
+  PAINTING               // малярка
+  DRYING                 // сушка
+  PRODUCED               // изготовлен
+  WAITING_SHIPMENT       // ожидает отправки
+  IN_DELIVERY            // передан в доставку
+  WAITING_PICKUP         // ожидает получения
+  COMPLETED              // завершён
+  CANCELED
+}
+
+enum MaterialStatus {
+  IN_STOCK
+  ON_ORDER
+  OUT_OF_STOCK
+}
+
+enum PaymentStatus {
+  UNPAID
+  PAID
+  REFUNDED
+}
+
+enum CompanyPlan {
+  FREE
+  START
+  FACTORY
+}
+
+// ================================
+// CORE SaaS MODELS
+// ================================
+
+model Company {
+  id                String        @id @default(uuid())
+  name              String
+  slug              String        @unique
+  plan              CompanyPlan   @default(FREE)
+  planExpiresAt     DateTime?
+  isActive          Boolean       @default(true)
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  users             User[]
+  products          Product[]
+  orders            Order[]
+  materials         Material[]
+  employees         EmployeeProfile[]
+  analytics         AnalyticsSnapshot[]
+
+  @@map("companies")
+}
+
+model User {
+  id            String     @id @default(uuid())
+  companyId     String?
+  company       Company?   @relation(fields: [companyId], references: [id])
+
+  role          UserRole   @default(CLIENT)
+
+  email         String?    @unique
+  phone         String?    @unique
+  passwordHash  String?
+
+  name          String?
+  isActive      Boolean    @default(true)
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  orders        Order[]
+
+  @@map("users")
+}
+
+// ================================
+// PRODUCTS
+// ================================
+
+model Product {
+  id              String      @id @default(uuid())
+  companyId       String
+  company         Company     @relation(fields: [companyId], references: [id])
+
+  name            String
+  slug            String
+  description     String?
+
+  basePrice       Int
+  costPrice       Int         // себестоимость
+
+  is3DEnabled     Boolean     @default(false)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  materials       ProductMaterial[]
+  orderItems      OrderItem[]
+
+  @@unique([companyId, slug])
+  @@map("products")
+}
+
+model ProductMaterial {
+  id            String         @id @default(uuid())
+  productId     String
+  materialId    String
+
+  averageUsage  Float          // средний расход на изделие
+  extraDays     Int            @default(0)
+
+  product       Product        @relation(fields: [productId], references: [id])
+  material      Material       @relation(fields: [materialId], references: [id])
+
+  @@map("product_materials")
+}
+
+// ================================
+// MATERIALS
+// ================================
+
+model Material {
+  id              String         @id @default(uuid())
+  companyId       String
+  company         Company        @relation(fields: [companyId], references: [id])
+
+  name            String
+  type            String         // шпон, эмаль, лак и тд
+  status          MaterialStatus @default(IN_STOCK)
+
+  stockAmount     Float
+  criticalAmount  Float
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  products        ProductMaterial[]
+
+  @@map("materials")
+}
+
+// ================================
+// ORDERS
+// ================================
+
+model Order {
+  id              String         @id @default(uuid())
+  companyId       String
+  company         Company        @relation(fields: [companyId], references: [id])
+
+  userId          String?
+  user            User?          @relation(fields: [userId], references: [id])
+
+  status          OrderStatus    @default(PENDING)
+  paymentStatus   PaymentStatus @default(UNPAID)
+
+  isVip           Boolean        @default(false)
+  vipExtraPrice   Int            @default(0)
+
+  totalPrice      Int
+  productionDays  Int
+
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  items           OrderItem[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id            String      @id @default(uuid())
+  orderId       String
+  productId     String
+
+  quantity      Int
+  itemStatus    OrderStatus @default(PENDING)
+
+  order         Order       @relation(fields: [orderId], references: [id])
+  product       Product     @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// ================================
+// EMPLOYEES & PRODUCTION
+// ================================
+
+model EmployeeProfile {
+  id              String      @id @default(uuid())
+  companyId       String
+  userId          String      @unique
+
+  role            UserRole
+  hourlyRate      Int?
+
+  createdAt       DateTime    @default(now())
+
+  company         Company     @relation(fields: [companyId], references: [id])
+  user            User        @relation(fields: [userId], references: [id])
+
+  @@map("employees")
+}
+
+// ================================
+// ANALYTICS
+// ================================
+
+model AnalyticsSnapshot {
+  id              String      @id @default(uuid())
+  companyId       String
+
+  date            DateTime
+
+  revenue         Int
+  expenses        Int
+  profit          Int
+  ordersCount     Int
+
+  createdAt       DateTime    @default(now())
+
+  company         Company     @relation(fields: [companyId], references: [id])
+
+  @@map("analytics_snapshots")
+}
