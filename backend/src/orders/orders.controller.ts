@@ -7,122 +7,63 @@
 
 import {
   Controller,
-  Get,
   Post,
   Patch,
-  Param,
   Body,
-  Req,
-  UseGuards,
+  Param,
 } from '@nestjs/common';
-import { Request } from 'express';
 
 import { OrdersService, OrderStatus } from './orders.service';
-import { JwtAuthGuard } from '../auth/guards/jwt.guard';
-import { RolesGuard, UserRole } from '../auth/guards/roles.guard';
-import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
 export class OrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   /**
    * --------------------------------------------
-   * LIST ORDERS
-   * --------------------------------------------
-   * Admin / Manager / Master
-   */
-  @Get()
-  @Roles(
-    UserRole.ADMIN,
-    UserRole.MANAGER,
-    UserRole.MASTER,
-  )
-  async list(@Req() req: Request) {
-    return this.ordersService.listOrders(req.user.companyId);
-  }
-
-  /**
-   * --------------------------------------------
-   * CREATE ORDER (ADMIN / MANAGER)
+   * CREATE ORDER (SITE / ADMIN)
    * --------------------------------------------
    */
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async create(
-    @Req() req: Request,
-    @Body()
-    body: {
+  async createOrder(
+    @Body() body: {
+      companyId: string;
       clientId: string;
-      items: { productId: string; quantity: number }[];
-      isVip?: boolean;
+      items: {
+        productId: string;
+        quantity: number;
+        vip?: boolean;
+      }[];
+      deliveryType: 'DELIVERY' | 'PICKUP';
+      comment?: string;
     },
   ) {
-    return this.ordersService.createOrder({
-      companyId: req.user.companyId,
-      clientId: body.clientId,
-      items: body.items,
-      isVip: body.isVip,
-      createdByRole: req.user.role,
-    });
+    return this.ordersService.createOrder(body.companyId, body);
   }
 
   /**
    * --------------------------------------------
-   * ACCEPT ORDER
+   * ACCEPT ORDER (ADMIN)
    * --------------------------------------------
-   * Admin / Manager
    */
   @Patch(':id/accept')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  async accept(
-    @Req() req: Request,
-    @Param('id') id: string,
-    @Body('productionDays') productionDays?: number,
+  async acceptOrder(
+    @Param('id') orderId: string,
+    @Body() body: { companyId: string },
   ) {
-    return this.ordersService.acceptOrder(
-      id,
-      req.user.companyId,
-      productionDays,
-    );
+    return this.ordersService.acceptOrder(orderId, body.companyId);
   }
 
   /**
    * --------------------------------------------
-   * UPDATE ITEM STATUS (PRODUCTION LINE)
+   * UPDATE ORDER ITEM STATUS (PRODUCTION)
    * --------------------------------------------
-   * Admin / Master
    */
-  @Patch('item/:itemId/status')
-  @Roles(UserRole.ADMIN, UserRole.MASTER)
+  @Patch('items/:itemId/status')
   async updateItemStatus(
-    @Req() req: Request,
     @Param('itemId') itemId: string,
-    @Body('status') status: OrderStatus,
+    @Body() body: { status: OrderStatus },
   ) {
-    return this.ordersService.updateItemStatus(
-      itemId,
-      status,
-      req.user.companyId,
-    );
-  }
-
-  /**
-   * --------------------------------------------
-   * COMPLETE ORDER
-   * --------------------------------------------
-   * Admin
-   */
-  @Patch(':id/complete')
-  @Roles(UserRole.ADMIN)
-  async complete(
-    @Req() req: Request,
-    @Param('id') id: string,
-  ) {
-    return this.ordersService.completeOrder(
-      id,
-      req.user.companyId,
-    );
+    return this.ordersService.updateItemStatus(itemId, body.status);
   }
 }
