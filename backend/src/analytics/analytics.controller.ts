@@ -1,73 +1,34 @@
 /**
  * ============================================
  * ARTIVIO — ANALYTICS CONTROLLER
- * File: analytics.controller.ts
  * ============================================
  */
 
-import {
-  Controller,
-  Get,
-  Query,
-} from '@nestjs/common';
+import { Controller, Get, Req } from '@nestjs/common';
 import { AnalyticsService } from './analytics.service';
-import { StockMovementType } from '../warehouses/warehouses.types';
+import { TenantRequest } from '../domains/tenant.middleware';
 
 @Controller('analytics')
 export class AnalyticsController {
-  constructor(
-    private readonly analyticsService: AnalyticsService,
-  ) {}
+  constructor(private readonly analyticsService: AnalyticsService) {}
 
-  /**
-   * ------------------------------------------------
-   * ORDERS TURNOVER
-   * ------------------------------------------------
-   */
-  @Get('orders/turnover')
-  async getOrdersTurnover(
-    @Query('companyId') companyId: string,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.analyticsService.getOrdersTurnover({
-      companyId,
-      from: from ? new Date(from) : undefined,
-      to: to ? new Date(to) : undefined,
-    });
+  @Get('orders')
+  orders(@Req() req: TenantRequest) {
+    return this.analyticsService.orders(req.companyId!);
   }
 
-  /**
-   * ------------------------------------------------
-   * WAREHOUSE STOCK SUMMARY
-   * ------------------------------------------------
-   */
-  @Get('warehouses/stocks')
-  async getWarehouseStocks(
-    @Query('companyId') companyId: string,
-  ) {
-    return this.analyticsService.getWarehouseStockSummary(
-      companyId,
-    );
+  @Get('revenue')
+  revenue(@Req() req: TenantRequest) {
+    return this.analyticsService.revenue(req.companyId!);
   }
 
-  /**
-   * ------------------------------------------------
-   * STOCK MOVEMENTS
-   * ------------------------------------------------
-   */
-  @Get('warehouses/movements')
-  async getStockMovements(
-    @Query('companyId') companyId: string,
-    @Query('type') type?: StockMovementType,
-    @Query('from') from?: string,
-    @Query('to') to?: string,
-  ) {
-    return this.analyticsService.getStockMovements({
-      companyId,
-      type,
-      from: from ? new Date(from) : undefined,
-      to: to ? new Date(to) : undefined,
-    });
+  @Get('warehouses')
+  warehouses(@Req() req: TenantRequest) {
+    return this.analyticsService.warehouses(req.companyId!);
+  }
+
+  @Get('saas')
+  saas(@Req() req: TenantRequest) {
+    return this.analyticsService.saasUsage(req.companyId!);
   }
 }

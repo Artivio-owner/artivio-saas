@@ -1,59 +1,36 @@
 /**
  * ============================================
- * ARTIVIO — NOTIFICATIONS SERVICE
- * File: notifications.service.ts
+ * ARTIVIO — NOTIFICATION SERVICE
  * ============================================
  */
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-
-export enum NotificationType {
-  LOW_STOCK = 'LOW_STOCK',
-  ORDER_ERROR = 'ORDER_ERROR',
-  SYSTEM = 'SYSTEM',
-}
-
-export enum NotificationChannel {
-  INTERNAL = 'INTERNAL',
-  EMAIL = 'EMAIL',
-  TELEGRAM = 'TELEGRAM',
-}
+import { NotificationPayload } from './notification.types';
+import { TelegramService } from './telegram.service';
 
 @Injectable()
-export class NotificationsService {
+export class NotificationService {
   constructor(
     private readonly prisma: PrismaService,
+    private readonly telegramService: TelegramService,
   ) {}
 
-  /**
-   * ------------------------------------------------
-   * CREATE NOTIFICATION
-   * ------------------------------------------------
-   */
-  async notify(params: {
-    companyId: string;
-    type: NotificationType;
-    title: string;
-    message: string;
-    channels?: NotificationChannel[];
-    meta?: Record<string, any>;
-  }) {
-    const notification =
-      await this.prisma.notification.create({
-        data: {
-          companyId: params.companyId,
-          type: params.type,
-          title: params.title,
-          message: params.message,
-          meta: params.meta,
-        },
-      });
+  async dispatch(payload: NotificationPayload) {
+    // 1️⃣ сохраняем в БД
+    await this.prisma.notification.create({
+      data: {
+        companyId: payload.companyId,
+        type: payload.type,
+        title: payload.title,
+        message: payload.message,
+        metadata: payload.metadata,
+      },
+    });
 
-    // channels — future extensions
-    // EMAIL / TELEGRAM / PUSH
-    // handled asynchronously
+    // 2️⃣ отправляем в Telegram (если подключён)
+    await this.telegramService.sendIfEnabled(payload.companyId, payload);
 
-    return notification;
+    return true;
   }
 }

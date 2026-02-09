@@ -1,7 +1,6 @@
 /**
  * ============================================
  * ARTIVIO — ANALYTICS MODULE
- * File: analytics.module.ts
  * ============================================
  */
 
@@ -12,10 +11,6 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
   controllers: [AnalyticsController],
-  providers: [
-    AnalyticsService,
-    PrismaService,
-  ],
-  exports: [AnalyticsService],
+  providers: [AnalyticsService, PrismaService],
 })
 export class AnalyticsModule {}

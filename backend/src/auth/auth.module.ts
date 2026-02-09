@@ -1,58 +1,27 @@
 /**
  * ============================================
  * ARTIVIO — AUTH MODULE
- * File: auth.module.ts
  * ============================================
  */
 
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
-
+import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { RolesGuard } from './roles.guard';
-
-import { PrismaModule } from '../prisma/prisma.module';
-import { EmployeesModule } from '../employees/employees.module';
-import { ClientsModule } from '../clients/clients.module';
+import { JwtStrategy } from './jwt.strategy';
+import { PrismaService } from '../prisma/prisma.service';
+import { SuperAdminController } from './super-admin.controller';
 
 @Module({
   imports: [
-    PrismaModule,
-
-    /**
-     * JWT — основа авторизации
-     */
+    PassportModule,
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'ARTIVIO_SECRET_KEY',
-      signOptions: {
-        expiresIn: '7d',
-      },
+      secret: process.env.JWT_SECRET || 'artivio_secret',
+      signOptions: { expiresIn: '7d' },
     }),
-
-    /**
-     * Сотрудники:
-     * - роли
-     * - права
-     */
-    EmployeesModule,
-
-    /**
-     * Клиенты:
-     * - доступ в личный кабинет
-     */
-    ClientsModule,
   ],
-  providers: [
-    AuthService,
-    RolesGuard,
-  ],
-  controllers: [
-    AuthController,
-  ],
-  exports: [
-    AuthService,
-    RolesGuard,
-  ],
+  controllers: [AuthController, SuperAdminController],
+  providers: [AuthService, JwtStrategy, PrismaService],
 })
 export class AuthModule {}

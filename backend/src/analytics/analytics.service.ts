@@ -1,110 +1,89 @@
 /**
  * ============================================
  * ARTIVIO — ANALYTICS SERVICE
- * File: analytics.service.ts
  * ============================================
  */
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { StockMovementType } from '../warehouses/warehouses.types';
+import { OrderStatus } from '../orders/order.entity';
 
 @Injectable()
 export class AnalyticsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * ------------------------------------------------
-   * ORDERS TURNOVER
-   * ------------------------------------------------
-   */
-  async getOrdersTurnover(params: {
-    companyId: string;
-    from?: Date;
-    to?: Date;
-  }) {
-    const orders =
-      await this.prisma.order.findMany({
-        where: {
-          companyId: params.companyId,
-          createdAt: {
-            gte: params.from,
-            lte: params.to,
-          },
-          status: 'COMPLETED',
-        },
-        select: {
-          total: true,
-        },
-      });
+  async orders(companyId: string) {
+    const totalOrders = await this.prisma.order.count({ where: { companyId } });
+    const completedOrders = await this.prisma.order.count({
+      where: { companyId, status: OrderStatus.COMPLETED },
+    });
+    const cancelledOrders = await this.prisma.order.count({
+      where: { companyId, status: OrderStatus.CANCELLED },
+    });
 
     return {
-      totalOrders: orders.length,
-      turnover: orders.reduce(
-        (sum, o) => sum + o.total,
-        0,
-      ),
+      totalOrders,
+      completedOrders,
+      cancelledOrders,
     };
   }
 
-  /**
-   * ------------------------------------------------
-   * WAREHOUSE STOCK SUMMARY
-   * ------------------------------------------------
-   */
-  async getWarehouseStockSummary(
-    companyId: string,
-  ) {
-    const stocks =
-      await this.prisma.warehouseStock.findMany({
-        where: {
-          warehouse: {
-            companyId,
-          },
-        },
-        include: {
-          warehouse: true,
-        },
-      });
+  async revenue(companyId: string) {
+    const orders = await this.prisma.order.findMany({
+      where: { companyId, status: OrderStatus.COMPLETED },
+      select: { totalAmount: true },
+    });
 
-    return stocks.map((s) => ({
-      warehouseId: s.warehouseId,
-      warehouseName: s.warehouse.name,
-      productId: s.productId,
-      materialId: s.materialId,
-      quantity: s.quantity,
-      reserved: s.reserved,
-      available: s.quantity - s.reserved,
-    }));
+    const totalRevenue = orders.reduce(
+      (sum, o) => sum + (o.totalAmount || 0),
+      0,
+    );
+
+    return {
+      totalRevenue,
+      averageOrderValue:
+        orders.length > 0 ? totalRevenue / orders.length : 0,
+    };
   }
 
-  /**
-   * ------------------------------------------------
-   * STOCK MOVEMENTS
-   * ------------------------------------------------
-   */
-  async getStockMovements(params: {
-    companyId: string;
-    from?: Date;
-    to?: Date;
-    type?: StockMovementType;
-  }) {
-    return this.prisma.stockMovement.findMany({
-      where: {
-        warehouse: {
-          companyId: params.companyId,
-        },
-        type: params.type,
-        createdAt: {
-          gte: params.from,
-          lte: params.to,
-        },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+  async warehouses(companyId: string) {
+    const totalWarehouses = await this.prisma.warehouse.count({
+      where: { companyId },
     });
+
+    const inventory = await this.prisma.inventory.findMany({
+      where: {
+        warehouse: { companyId },
+      },
+      include: { material: true },
+    });
+
+    const lowStockItems = inventory.filter(
+      (i) => i.quantity <= i.material.criticalStock,
+    ).length;
+
+    return {
+      totalWarehouses,
+      totalStockItems: inventory.length,
+      lowStockItems,
+    };
+  }
+
+  async saasUsage(companyId: string) {
+    const warehousesUsed = await this.prisma.warehouse.count({
+      where: { companyId },
+    });
+    const productsUsed = await this.prisma.material.count({
+      where: { companyId },
+    });
+    const usersUsed = await this.prisma.user.count({
+      where: { companyId },
+    });
+
+    return {
+      warehousesUsed,
+      productsUsed,
+      usersUsed,
+    };
   }
 }

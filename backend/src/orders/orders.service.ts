@@ -1,124 +1,92 @@
 /**
  * ============================================
  * ARTIVIO — ORDERS SERVICE
- * File: orders.service.ts
  * ============================================
  */
 
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OrderWarehouseHook } from './order-warehouse.hook';
-
-export enum OrderStatus {
-  CREATED = 'CREATED',
-  CANCELLED = 'CANCELLED',
-  PAID = 'PAID',
-  SHIPPED = 'SHIPPED',
-}
+import { InventoryService } from '../warehouses/inventory.service';
+import { OrderStatus } from './order.entity';
 
 @Injectable()
 export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly warehouseHook: OrderWarehouseHook,
+    private readonly inventoryService: InventoryService,
   ) {}
 
-  /**
-   * ------------------------------------------------
-   * CREATE ORDER
-   * ------------------------------------------------
-   */
   async createOrder(params: {
     companyId: string;
     warehouseId: string;
-    items: Array<{
-      productId: string;
-      quantity: number;
-      price: number;
-    }>;
+    items: { materialId: string; quantity: number }[];
+    marketplace?: any;
+    isPickup: boolean;
   }) {
-    if (!params.items.length) {
-      throw new BadRequestException('Order is empty');
+    // 1️⃣ резервируем склад
+    for (const item of params.items) {
+      await this.inventoryService.reserveMaterial({
+        warehouseId: params.warehouseId,
+        materialId: item.materialId,
+        quantity: item.quantity,
+      });
     }
 
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.create({
-        data: {
-          companyId: params.companyId,
-          status: OrderStatus.CREATED,
-          warehouseId: params.warehouseId,
-          totalAmount: params.items.reduce(
-            (sum, i) => sum + i.price * i.quantity,
-            0,
-          ),
-          items: {
-            create: params.items.map((i) => ({
-              productId: i.productId,
-              quantity: i.quantity,
-              price: i.price,
-            })),
-          },
-        },
-        include: { items: true },
-      });
-
-      await this.warehouseHook.reserveForOrder({
+    // 2️⃣ создаём заказ
+    return this.prisma.order.create({
+      data: {
+        companyId: params.companyId,
         warehouseId: params.warehouseId,
-        items: params.items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-        })),
-        orderId: order.id,
-      });
-
-      return order;
+        status: OrderStatus.RESERVED,
+        items: params.items,
+        marketplace: params.marketplace,
+        isPickup: params.isPickup,
+      },
     });
   }
 
-  /**
-   * ------------------------------------------------
-   * CANCEL ORDER
-   * ------------------------------------------------
-   */
-  async cancelOrder(params: {
-    companyId: string;
-    orderId: string;
-  }) {
-    return this.prisma.$transaction(async (tx) => {
-      const order = await tx.order.findFirst({
-        where: {
-          id: params.orderId,
-          companyId: params.companyId,
-        },
-        include: { items: true },
-      });
+  async markPaid(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) throw new BadRequestException('Order not found');
 
-      if (!order) {
-        throw new BadRequestException('Order not found');
-      }
-
-      if (order.status !== OrderStatus.CREATED) {
-        throw new BadRequestException(
-          'Only new orders can be cancelled',
-        );
-      }
-
-      await this.warehouseHook.releaseForOrder({
+    // 3️⃣ подтверждаем списание
+    for (const item of order.items as any[]) {
+      await this.inventoryService.commitReservation({
         warehouseId: order.warehouseId,
-        items: order.items.map((i) => ({
-          productId: i.productId,
-          quantity: i.quantity,
-        })),
-        orderId: order.id,
+        materialId: item.materialId,
+        quantity: item.quantity,
       });
+    }
 
-      return tx.order.update({
-        where: { id: order.id },
-        data: { status: OrderStatus.CANCELLED },
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.PAID },
+    });
+  }
+
+  async cancel(orderId: string) {
+    const order = await this.prisma.order.findUnique({ where: { id: orderId } });
+    if (!order) return;
+
+    // 4️⃣ откат резерва
+    for (const item of order.items as any[]) {
+      await this.inventoryService.rollbackReservation({
+        warehouseId: order.warehouseId,
+        materialId: item.materialId,
+        quantity: item.quantity,
       });
+    }
+
+    return this.prisma.order.update({
+      where: { id: orderId },
+      data: { status: OrderStatus.CANCELLED },
+    });
+  }
+
+  async list(companyId: string) {
+    return this.prisma.order.findMany({
+      where: { companyId },
+      orderBy: { createdAt: 'desc' },
     });
   }
 }

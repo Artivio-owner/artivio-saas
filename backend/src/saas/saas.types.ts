@@ -1,6 +1,7 @@
 /**
  * ============================================
- * ARTIVIO — SAAS TYPES
+ * ARTIVIO — SAAS TYPES (CORE)
+ * File: saas.types.ts
  * ============================================
  */
 
@@ -15,4 +16,22 @@ export interface SaasLimits {
   products: number;
   ordersPerMonth: number;
   users: number;
+}
+
+export interface SaasFeatureFlags {
+  analytics: boolean;
+  warehouses: boolean;
+  orders: boolean;
+  notifications: boolean;
+  marketingIntegrations: boolean;
+  pwa: boolean;
+  helpdesk: boolean;
+}
+
+export interface SaasCompany {
+  id: string;
+  name: string;
+  plan: SaasPlan;
+  limits: SaasLimits;
+  features: SaasFeatureFlags;
 }

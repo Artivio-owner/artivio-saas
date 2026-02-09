@@ -1,6 +1,7 @@
 /**
  * ============================================
- * ARTIVIO — SAAS MODULE
+ * ARTIVIO — SAAS MODULE (CORE)
+ * File: saas.module.ts
  * ============================================
  */
 

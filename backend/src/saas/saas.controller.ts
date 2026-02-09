@@ -1,6 +1,7 @@
 /**
  * ============================================
- * ARTIVIO — SAAS CONTROLLER
+ * ARTIVIO — SAAS CONTROLLER (CORE)
+ * File: saas.controller.ts
  * ============================================
  */
 
@@ -11,14 +12,8 @@ import { SaasService } from './saas.service';
 export class SaasController {
   constructor(private readonly saasService: SaasService) {}
 
-  @Get('plan')
-  async getPlan(@Query('companyId') companyId: string) {
-    const plan = await this.saasService.getCompanyPlan(companyId);
-    const limits = this.saasService.getLimits(plan);
-
-    return {
-      plan,
-      limits,
-    };
+  @Get('info')
+  async getCompanyInfo(@Query('companyId') companyId: string) {
+    return this.saasService.getCompanyInfo(companyId);
   }
 }

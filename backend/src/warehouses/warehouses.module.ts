@@ -1,27 +1,26 @@
 /**
  * ============================================
  * ARTIVIO — WAREHOUSES MODULE
- * File: warehouses.module.ts
  * ============================================
  */
 
 import { Module } from '@nestjs/common';
-
-import { WarehousesService } from './warehouses.service';
+import { WarehouseService } from './warehouse.service';
+import { InventoryService } from './inventory.service';
+import { BarcodeService } from './barcode.service';
 import { WarehousesController } from './warehouses.controller';
-
-import { PrismaModule } from '../prisma/prisma.module';
-import { ProductsModule } from '../products/products.module';
-import { MaterialsModule } from '../materials/materials.module';
+import { PrismaService } from '../prisma/prisma.service';
+import { SaasModule } from '../saas/saas.module';
 
 @Module({
-  imports: [
-    PrismaModule,
-    ProductsModule,
-    MaterialsModule,
-  ],
-  providers: [WarehousesService],
+  imports: [SaasModule],
   controllers: [WarehousesController],
-  exports: [WarehousesService],
+  providers: [
+    WarehouseService,
+    InventoryService,
+    BarcodeService,
+    PrismaService,
+  ],
+  exports: [InventoryService],
 })
 export class WarehousesModule {}

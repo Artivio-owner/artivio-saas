@@ -1,49 +1,44 @@
 /**
  * ============================================
- * ARTIVIO — SAAS SERVICE
+ * ARTIVIO — SAAS SERVICE (CORE)
+ * File: saas.service.ts
  * ============================================
  */
 
 import { Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { SaasPlan, SaasLimits } from './saas.types';
+import { SaasPlan, SaasLimits, SaasFeatureFlags } from './saas.types';
 
 const PLAN_LIMITS: Record<SaasPlan, SaasLimits> = {
-  FREE: {
-    warehouses: 1,
-    products: 20,
-    ordersPerMonth: 50,
-    users: 1,
-  },
-  BASIC: {
-    warehouses: 3,
-    products: 200,
-    ordersPerMonth: 500,
-    users: 5,
-  },
-  PRO: {
-    warehouses: 999,
-    products: 9999,
-    ordersPerMonth: 99999,
-    users: 50,
-  },
+  FREE: { warehouses: 1, products: 20, ordersPerMonth: 50, users: 1 },
+  BASIC: { warehouses: 3, products: 200, ordersPerMonth: 500, users: 5 },
+  PRO: { warehouses: 999, products: 9999, ordersPerMonth: 99999, users: 50 },
+};
+
+const PLAN_FEATURES: Record<SaasPlan, SaasFeatureFlags> = {
+  FREE: { analytics: false, warehouses: true, orders: true, notifications: false, marketingIntegrations: false, pwa: false, helpdesk: false },
+  BASIC: { analytics: true, warehouses: true, orders: true, notifications: true, marketingIntegrations: true, pwa: true, helpdesk: true },
+  PRO: { analytics: true, warehouses: true, orders: true, notifications: true, marketingIntegrations: true, pwa: true, helpdesk: true },
 };
 
 @Injectable()
 export class SaasService {
   constructor(private readonly prisma: PrismaService) {}
 
-  getLimits(plan: SaasPlan): SaasLimits {
-    return PLAN_LIMITS[plan];
-  }
-
   async getCompanyPlan(companyId: string): Promise<SaasPlan> {
     const company = await this.prisma.company.findUnique({
       where: { id: companyId },
       select: { plan: true },
     });
-
     return (company?.plan as SaasPlan) ?? SaasPlan.FREE;
+  }
+
+  getLimits(plan: SaasPlan): SaasLimits {
+    return PLAN_LIMITS[plan];
+  }
+
+  getFeatures(plan: SaasPlan): SaasFeatureFlags {
+    return PLAN_FEATURES[plan];
   }
 
   async assertLimit(params: {
@@ -53,11 +48,17 @@ export class SaasService {
   }) {
     const plan = await this.getCompanyPlan(params.companyId);
     const limits = this.getLimits(plan);
-
     if (params.current >= limits[params.type]) {
-      throw new ForbiddenException(
-        `SaaS limit reached: ${params.type}`,
-      );
+      throw new ForbiddenException(`SaaS limit reached: ${params.type}`);
     }
+  }
+
+  async getCompanyInfo(companyId: string) {
+    const plan = await this.getCompanyPlan(companyId);
+    return {
+      plan,
+      limits: this.getLimits(plan),
+      features: this.getFeatures(plan),
+    };
   }
 }
