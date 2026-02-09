@@ -7,164 +7,104 @@
 
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { TariffsService } from '../saas/tariffs.service';
-import { AddonModule } from '../saas/saas.types';
+import { StockMovementType } from '../warehouses/warehouses.types';
 
 @Injectable()
 export class AnalyticsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly tariffsService: TariffsService,
   ) {}
 
   /**
-   * --------------------------------------------------
-   * ОБЩАЯ ФИНАНСОВАЯ СВОДКА
-   * --------------------------------------------------
+   * ------------------------------------------------
+   * ORDERS TURNOVER
+   * ------------------------------------------------
    */
-  async getFinanceSummary(
-    companyId: string,
-    from: Date,
-    to: Date,
-  ) {
-    await this.tariffsService.ensureModuleAccess(
-      companyId,
-      AddonModule.ANALYTICS,
-    );
+  async getOrdersTurnover(params: {
+    companyId: string;
+    from?: Date;
+    to?: Date;
+  }) {
+    const orders =
+      await this.prisma.order.findMany({
+        where: {
+          companyId: params.companyId,
+          createdAt: {
+            gte: params.from,
+            lte: params.to,
+          },
+          status: 'COMPLETED',
+        },
+        select: {
+          total: true,
+        },
+      });
 
-    const orders = await this.prisma.order.findMany({
+    return {
+      totalOrders: orders.length,
+      turnover: orders.reduce(
+        (sum, o) => sum + o.total,
+        0,
+      ),
+    };
+  }
+
+  /**
+   * ------------------------------------------------
+   * WAREHOUSE STOCK SUMMARY
+   * ------------------------------------------------
+   */
+  async getWarehouseStockSummary(
+    companyId: string,
+  ) {
+    const stocks =
+      await this.prisma.warehouseStock.findMany({
+        where: {
+          warehouse: {
+            companyId,
+          },
+        },
+        include: {
+          warehouse: true,
+        },
+      });
+
+    return stocks.map((s) => ({
+      warehouseId: s.warehouseId,
+      warehouseName: s.warehouse.name,
+      productId: s.productId,
+      materialId: s.materialId,
+      quantity: s.quantity,
+      reserved: s.reserved,
+      available: s.quantity - s.reserved,
+    }));
+  }
+
+  /**
+   * ------------------------------------------------
+   * STOCK MOVEMENTS
+   * ------------------------------------------------
+   */
+  async getStockMovements(params: {
+    companyId: string;
+    from?: Date;
+    to?: Date;
+    type?: StockMovementType;
+  }) {
+    return this.prisma.stockMovement.findMany({
       where: {
-        companyId,
+        warehouse: {
+          companyId: params.companyId,
+        },
+        type: params.type,
         createdAt: {
-          gte: from,
-          lte: to,
+          gte: params.from,
+          lte: params.to,
         },
       },
-      select: {
-        totalPrice: true,
-        costPrice: true,
+      orderBy: {
+        createdAt: 'desc',
       },
     });
-
-    const revenue = orders.reduce(
-      (sum, o) => sum + o.totalPrice,
-      0,
-    );
-
-    const cost = orders.reduce(
-      (sum, o) => sum + (o.costPrice || 0),
-      0,
-    );
-
-    return {
-      revenue,
-      cost,
-      profit: revenue - cost,
-    };
-  }
-
-  /**
-   * --------------------------------------------------
-   * KPI ПО ЗАКАЗАМ
-   * --------------------------------------------------
-   */
-  async getOrdersKPI(
-    companyId: string,
-    from: Date,
-    to: Date,
-  ) {
-    await this.tariffsService.ensureModuleAccess(
-      companyId,
-      AddonModule.ANALYTICS,
-    );
-
-    const totalOrders = await this.prisma.order.count({
-      where: {
-        companyId,
-        createdAt: { gte: from, lte: to },
-      },
-    });
-
-    const completedOrders = await this.prisma.order.count({
-      where: {
-        companyId,
-        status: 'COMPLETED',
-        createdAt: { gte: from, lte: to },
-      },
-    });
-
-    return {
-      totalOrders,
-      completedOrders,
-      completionRate:
-        totalOrders > 0
-          ? completedOrders / totalOrders
-          : 0,
-    };
-  }
-
-  /**
-   * --------------------------------------------------
-   * ПРОИЗВОДСТВО
-   * --------------------------------------------------
-   */
-  async getProductionStats(
-    companyId: string,
-    from: Date,
-    to: Date,
-  ) {
-    await this.tariffsService.ensureModuleAccess(
-      companyId,
-      AddonModule.ANALYTICS,
-    );
-
-    const tasks = await this.prisma.productionTask.findMany({
-      where: {
-        companyId,
-        createdAt: { gte: from, lte: to },
-      },
-      select: {
-        status: true,
-      },
-    });
-
-    const total = tasks.length;
-    const completed = tasks.filter(
-      (t) => t.status === 'DONE',
-    ).length;
-
-    return {
-      totalTasks: total,
-      completedTasks: completed,
-      efficiency:
-        total > 0 ? completed / total : 0,
-    };
-  }
-
-  /**
-   * --------------------------------------------------
-   * СОТРУДНИКИ
-   * --------------------------------------------------
-   */
-  async getEmployeesStats(companyId: string) {
-    await this.tariffsService.ensureModuleAccess(
-      companyId,
-      AddonModule.ANALYTICS,
-    );
-
-    const employees = await this.prisma.employee.findMany({
-      where: { companyId },
-      select: {
-        id: true,
-        isActive: true,
-      },
-    });
-
-    return {
-      totalEmployees: employees.length,
-      activeEmployees: employees.filter(
-        (e) => e.isActive,
-      ).length,
-    };
   }
 }

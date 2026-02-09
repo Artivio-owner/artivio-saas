@@ -1,18 +1,19 @@
 /**
  * ============================================
- * ARTIVIO — SAAS TYPES
+ * SAAS CONTRACTS
  * ============================================
  */
 
-export enum SaasPlan {
-  FREE = 'FREE',
-  BASIC = 'BASIC',
-  PRO = 'PRO',
-}
+export type SaasPlan = 'FREE' | 'BASIC' | 'PRO';
 
 export interface SaasLimits {
   warehouses: number;
   products: number;
   ordersPerMonth: number;
   users: number;
+}
+
+export interface SaasInfo {
+  plan: SaasPlan;
+  limits: SaasLimits;
 }

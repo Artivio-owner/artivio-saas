@@ -6,46 +6,80 @@
  */
 
 import { Module } from '@nestjs/common';
-
-import { PrismaModule } from './prisma/prisma.module';
-
-import { AuthModule } from './auth/auth.module';
-import { ClientsModule } from './clients/clients.module';
-import { EmployeesModule } from './employees/employees.module';
-import { AccountingModule } from './accounting/accounting.module';
+import { ConfigModule } from '@nestjs/config';
 
 /**
- * В будущем будут добавлены:
- * - OrdersModule
- * - ProductsModule
- * - ProductionModule
- * - SupportModule
- * - SaaS / BillingModule
+ * CORE
  */
+import { PrismaModule } from './prisma/prisma.module';
+
+/**
+ * AUTH & USERS
+ */
+import { AuthModule } from './auth/auth.module';
+import { UsersModule } from './users/users.module';
+import { CompaniesModule } from './companies/companies.module';
+
+/**
+ * BUSINESS
+ */
+import { ProductsModule } from './products/products.module';
+import { OrdersModule } from './orders/orders.module';
+import { WarehousesModule } from './warehouses/warehouses.module';
+
+/**
+ * ANALYTICS & NOTIFICATIONS
+ */
+import { AnalyticsModule } from './analytics/analytics.module';
+import { NotificationsModule } from './notifications/notifications.module';
+
+/**
+ * SAAS
+ */
+import { SaasModule } from './saas/saas.module';
 
 @Module({
   imports: [
+    /**
+     * ENV
+     */
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
+
+    /**
+     * CORE
+     */
     PrismaModule,
 
     /**
-     * Авторизация и роли
+     * AUTH
      */
     AuthModule,
+    UsersModule,
+    CompaniesModule,
 
     /**
-     * CRM
+     * BUSINESS
      */
-    ClientsModule,
+    ProductsModule,
+    OrdersModule,
+    WarehousesModule,
 
     /**
-     * Сотрудники и производство
+     * ANALYTICS
      */
-    EmployeesModule,
+    AnalyticsModule,
 
     /**
-     * Финансы и аналитика
+     * NOTIFICATIONS
      */
-    AccountingModule,
+    NotificationsModule,
+
+    /**
+     * SAAS
+     */
+    SaasModule,
   ],
 })
 export class AppModule {}

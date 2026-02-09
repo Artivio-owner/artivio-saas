@@ -6,26 +6,16 @@
  */
 
 import { Module } from '@nestjs/common';
-
-import { PrismaModule } from '../prisma/prisma.module';
-import { SaasModule } from '../saas/saas.module';
-
 import { AnalyticsService } from './analytics.service';
 import { AnalyticsController } from './analytics.controller';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Module({
-  imports: [
-    PrismaModule,
-    SaasModule, // проверка тарифов и доступов
-  ],
+  controllers: [AnalyticsController],
   providers: [
     AnalyticsService,
+    PrismaService,
   ],
-  controllers: [
-    AnalyticsController,
-  ],
-  exports: [
-    AnalyticsService,
-  ],
+  exports: [AnalyticsService],
 })
 export class AnalyticsModule {}

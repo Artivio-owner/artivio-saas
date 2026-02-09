@@ -1,10 +1,3 @@
-/**
- * ============================================
- * ARTIVIO — PRISMA SCHEMA
- * File: schema.prisma
- * ============================================
- */
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -15,99 +8,21 @@ datasource db {
 }
 
 /**
- * ------------------------------------------------
- * BASE MODELS
- * ------------------------------------------------
- */
-
-model Company {
-  id          String      @id @default(uuid())
-  name        String
-  createdAt  DateTime    @default(now())
-
-  warehouses  Warehouse[]
-}
-
-model Product {
-  id          String   @id @default(uuid())
-  companyId   String
-  name        String
-
-  stocks      WarehouseStock[]
-}
-
-model Material {
-  id          String   @id @default(uuid())
-  companyId   String
-  name        String
-
-  stocks      WarehouseStock[]
-}
-
-/**
- * ------------------------------------------------
- * WAREHOUSES
- * ------------------------------------------------
- */
-
-model Warehouse {
-  id         String       @id @default(uuid())
-  companyId  String
-  name       String
-  type       WarehouseType
-  address    String?
-  isActive   Boolean      @default(true)
-  createdAt DateTime     @default(now())
-
-  company    Company      @relation(fields: [companyId], references: [id])
-  stocks     WarehouseStock[]
-  movements  StockMovement[]
-
-  @@index([companyId])
-}
-
-model WarehouseStock {
-  id           String   @id @default(uuid())
-  warehouseId  String
-  productId    String?
-  materialId   String?
-  quantity     Int
-  reserved     Int      @default(0)
-  updatedAt    DateTime @updatedAt
-
-  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
-  product      Product?  @relation(fields: [productId], references: [id])
-  material     Material? @relation(fields: [materialId], references: [id])
-
-  @@unique([warehouseId, productId, materialId])
-}
-
-model StockMovement {
-  id           String             @id @default(uuid())
-  warehouseId  String
-  productId    String?
-  materialId   String?
-  type         StockMovementType
-  quantity     Int
-  reason       String?
-  createdAt    DateTime           @default(now())
-
-  warehouse    Warehouse @relation(fields: [warehouseId], references: [id])
-
-  @@index([warehouseId])
-  @@index([createdAt])
-}
-
-/**
- * ------------------------------------------------
+ * --------------------------------------------
  * ENUMS
- * ------------------------------------------------
+ * --------------------------------------------
  */
 
-enum WarehouseType {
-  MAIN
-  PRODUCTION
-  TRANSIT
+enum SaasPlan {
+  FREE
+  BASIC
+  PRO
+}
+
+enum NotificationType {
+  LOW_STOCK
+  ORDER_ERROR
+  SYSTEM
 }
 
 enum StockMovementType {
@@ -115,13 +30,118 @@ enum StockMovementType {
   OUT
   RESERVE
   RELEASE
-  ADJUST
 }
 
 /**
- * ------------------------------------------------
+ * --------------------------------------------
+ * CORE
+ * --------------------------------------------
+ */
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  plan      SaasPlan @default(FREE)
+
+  users         User[]
+  warehouses    Warehouse[]
+  notifications Notification[]
+  telegram      TelegramIntegration?
+
+  createdAt DateTime @default(now())
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  companyId String
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+/**
+ * --------------------------------------------
+ * WAREHOUSES
+ * --------------------------------------------
+ */
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String
+  companyId String
+
+  company Company @relation(fields: [companyId], references: [id])
+  stocks  WarehouseStock[]
+  moves   StockMovement[]
+
+  createdAt DateTime @default(now())
+}
+
+model WarehouseStock {
+  id          String   @id @default(uuid())
+  warehouseId String
+  productId   String?
+  materialId  String?
+  quantity    Int
+  reserved    Int
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  @@unique([warehouseId, productId, materialId])
+}
+
+model StockMovement {
+  id          String            @id @default(uuid())
+  warehouseId String
+  productId   String?
+  materialId  String?
+  type        StockMovementType
+  quantity    Int
+  reason      String?
+
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+/**
+ * --------------------------------------------
+ * ORDERS
+ * --------------------------------------------
+ */
+
+model Order {
+  id          String   @id @default(uuid())
+  companyId   String
+  warehouseId String
+  status      String
+  totalAmount Float
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  shippedAt DateTime?
+
+  company   Company   @relation(fields: [companyId], references: [id])
+  warehouse Warehouse @relation(fields: [warehouseId], references: [id])
+}
+
+model OrderItem {
+  id        String @id @default(uuid())
+  orderId  String
+  productId String
+  quantity Int
+  price    Float
+
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+/**
+ * --------------------------------------------
  * NOTIFICATIONS
- * ------------------------------------------------
+ * --------------------------------------------
  */
 
 model Notification {
@@ -132,17 +152,23 @@ model Notification {
   message   String
   meta      Json?
   isRead    Boolean          @default(false)
-  createdAt DateTime         @default(now())
 
-  company   Company          @relation(fields: [companyId], references: [id])
+  company   Company @relation(fields: [companyId], references: [id])
 
-  @@index([companyId])
-  @@index([type])
-  @@index([createdAt])
+  createdAt DateTime @default(now())
 }
 
-enum NotificationType {
-  LOW_STOCK
-  ORDER_ERROR
-  SYSTEM
+/**
+ * --------------------------------------------
+ * TELEGRAM
+ * --------------------------------------------
+ */
+
+model TelegramIntegration {
+  id        String  @id @default(uuid())
+  companyId String @unique
+  chatId    String
+  isActive  Boolean @default(true)
+
+  company Company @relation(fields: [companyId], references: [id])
 }

@@ -9,90 +9,65 @@ import {
   Controller,
   Get,
   Query,
-  Req,
-  UseGuards,
 } from '@nestjs/common';
-
 import { AnalyticsService } from './analytics.service';
-
-/**
- * Guards:
- * - AuthGuard (JWT)
- * - CompanyContextGuard (проставляет req.companyId)
- * Предполагаются существующими
- */
+import { StockMovementType } from '../warehouses/warehouses.types';
 
 @Controller('analytics')
-@UseGuards(/* AuthGuard */)
 export class AnalyticsController {
   constructor(
     private readonly analyticsService: AnalyticsService,
   ) {}
 
   /**
-   * --------------------------------------------------
-   * ФИНАНСОВАЯ СВОДКА
-   * --------------------------------------------------
-   * GET /analytics/finance?from=2024-01-01&to=2024-01-31
+   * ------------------------------------------------
+   * ORDERS TURNOVER
+   * ------------------------------------------------
    */
-  @Get('finance')
-  async finance(
-    @Req() req: any,
-    @Query('from') from: string,
-    @Query('to') to: string,
+  @Get('orders/turnover')
+  async getOrdersTurnover(
+    @Query('companyId') companyId: string,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.analyticsService.getFinanceSummary(
-      req.companyId,
-      new Date(from),
-      new Date(to),
+    return this.analyticsService.getOrdersTurnover({
+      companyId,
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+    });
+  }
+
+  /**
+   * ------------------------------------------------
+   * WAREHOUSE STOCK SUMMARY
+   * ------------------------------------------------
+   */
+  @Get('warehouses/stocks')
+  async getWarehouseStocks(
+    @Query('companyId') companyId: string,
+  ) {
+    return this.analyticsService.getWarehouseStockSummary(
+      companyId,
     );
   }
 
   /**
-   * --------------------------------------------------
-   * KPI ЗАКАЗОВ
-   * --------------------------------------------------
+   * ------------------------------------------------
+   * STOCK MOVEMENTS
+   * ------------------------------------------------
    */
-  @Get('orders')
-  async orders(
-    @Req() req: any,
-    @Query('from') from: string,
-    @Query('to') to: string,
+  @Get('warehouses/movements')
+  async getStockMovements(
+    @Query('companyId') companyId: string,
+    @Query('type') type?: StockMovementType,
+    @Query('from') from?: string,
+    @Query('to') to?: string,
   ) {
-    return this.analyticsService.getOrdersKPI(
-      req.companyId,
-      new Date(from),
-      new Date(to),
-    );
-  }
-
-  /**
-   * --------------------------------------------------
-   * ПРОИЗВОДСТВО
-   * --------------------------------------------------
-   */
-  @Get('production')
-  async production(
-    @Req() req: any,
-    @Query('from') from: string,
-    @Query('to') to: string,
-  ) {
-    return this.analyticsService.getProductionStats(
-      req.companyId,
-      new Date(from),
-      new Date(to),
-    );
-  }
-
-  /**
-   * --------------------------------------------------
-   * СОТРУДНИКИ
-   * --------------------------------------------------
-   */
-  @Get('employees')
-  async employees(@Req() req: any) {
-    return this.analyticsService.getEmployeesStats(
-      req.companyId,
-    );
+    return this.analyticsService.getStockMovements({
+      companyId,
+      type,
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+    });
   }
 }
