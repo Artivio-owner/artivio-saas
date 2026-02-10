@@ -178,3 +178,34 @@ export class ProductsService {
     return Boolean(product.isVipAvailable);
   }
 }
+
+/**
+ * ============================================
+ * PRODUCTS SERVICE
+ * ============================================
+ */
+
+import { PrismaClient } from '@prisma/client';
+import { generateBarcode, generateQRCode } from '../utils/barcode.util';
+
+const prisma = new PrismaClient();
+
+export class ProductsService {
+  static async create(companyId: string, data: any) {
+    const barcode = await generateBarcode(data.article);
+    const qrCode = await generateQRCode(data.article);
+
+    return prisma.product.create({
+      data: {
+        ...data,
+        barcode,
+        qrCode,
+        companyId,
+      },
+    });
+  }
+
+  static async list(companyId: string) {
+    return prisma.product.findMany({ where: { companyId } });
+  }
+}

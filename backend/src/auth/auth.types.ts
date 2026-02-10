@@ -4,10 +4,10 @@
  * ============================================
  */
 
-import { Role } from './roles.enum';
+import { Role } from '@prisma/client';
 
-export interface AuthUser {
-  id: string;
-  companyId?: string; // отсутствует у SUPER_ADMIN
+export interface JwtPayload {
+  userId: string;
   role: Role;
+  companyId?: string | null;
 }

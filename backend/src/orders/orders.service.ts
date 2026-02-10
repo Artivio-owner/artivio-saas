@@ -90,3 +90,37 @@ export class OrdersService {
     });
   }
 }
+
+/**
+ * ============================================
+ * ORDERS SERVICE
+ * ============================================
+ */
+
+import { PrismaClient } from '@prisma/client';
+import { generateBarcode } from '../utils/barcode.util';
+
+const prisma = new PrismaClient();
+
+export class OrdersService {
+  static async create(companyId: string, data: any) {
+    let labelUrl = data.labelUrl || null;
+
+    // если самовывоз → генерируем штрихкод
+    if (!data.marketplace) {
+      labelUrl = await generateBarcode(data.number);
+    }
+
+    return prisma.order.create({
+      data: {
+        ...data,
+        labelUrl,
+        companyId,
+      },
+    });
+  }
+
+  static async list(companyId: string) {
+    return prisma.order.findMany({ where: { companyId } });
+  }
+}

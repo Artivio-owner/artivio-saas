@@ -35,3 +35,16 @@ export interface SaasCompany {
   limits: SaasLimits;
   features: SaasFeatureFlags;
 }
+
+/**
+ * ============================================
+ * ARTIVIO — SAAS TYPES
+ * ============================================
+ */
+
+import { Company } from '@prisma/client';
+
+export interface SaaSRequestContext {
+  company: Company | null;
+  isPlatform: boolean; // artivio.ru
+}

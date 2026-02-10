@@ -62,3 +62,46 @@ export class SaasService {
     };
   }
 }
+
+/**
+ * ============================================
+ * ARTIVIO — SAAS SERVICE
+ * Определение компании по домену
+ * ============================================
+ */
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export class SaaSService {
+  static async resolveCompany(host: string) {
+    const cleanHost = host.split(':')[0].toLowerCase();
+
+    // 1️⃣ Платформа (artivio.ru, localhost)
+    if (
+      cleanHost === 'artivio.ru' ||
+      cleanHost.endsWith('.artivio.ru') === false
+    ) {
+      return { company: null, isPlatform: true };
+    }
+
+    // 2️⃣ Поддомен (*.artivio.ru)
+    if (cleanHost.endsWith('.artivio.ru')) {
+      const subdomain = cleanHost.replace('.artivio.ru', '');
+
+      const company = await prisma.company.findFirst({
+        where: { slug: subdomain },
+      });
+
+      return { company, isPlatform: false };
+    }
+
+    // 3️⃣ Кастомный домен клиента
+    const company = await prisma.company.findFirst({
+      where: { domain: cleanHost },
+    });
+
+    return { company, isPlatform: false };
+  }
+}

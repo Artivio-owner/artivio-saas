@@ -1,10 +1,3 @@
-/**
- * ============================================
- * ARTIVIO — PRISMA SCHEMA
- * File: schema.prisma
- * ============================================
- */
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -14,157 +7,154 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/* =====================================================
-   КОМПАНИИ (SaaS-ИЗОЛЯЦИЯ)
-   ===================================================== */
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  USER
+}
+
+/* =======================
+   USER / AUTH / RBAC
+======================= */
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      Role     @default(USER)
+
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
+
+  auditLogs AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+/* =======================
+   COMPANY — SaaS CORE
+======================= */
+
 model Company {
-  id            String   @id @default(uuid())
-  name          String
-  domain        String?
-  isActive      Boolean  @default(true)
-  tariff        String   @default("FREE")
-  tariffUntil   DateTime?
-  createdAt     DateTime @default(now())
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  domain    String?
+  subdomain String?
 
-  employees     Employee[]
-  clients       Client[]
-  products      Product[]
-  orders        Order[]
-  expenses      Expense[]
+  users        User[]
+  products     Product[]
+  orders       Order[]
+  warehouses   Warehouse[]
+  landings     Landing[]
+  subscription Subscription?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =====================================================
-   СОТРУДНИКИ
-   ===================================================== */
-model Employee {
-  id            String   @id @default(uuid())
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id])
+/* =======================
+   SUBSCRIPTION / BILLING
+======================= */
 
-  email         String   @unique
-  name          String
-  role          String
-  passwordHash  String
-  isActive      Boolean  @default(true)
+model Subscription {
+  id        String   @id @default(uuid())
+  plan      String
+  status    String
 
-  productionStages ProductionStage[]
+  companyId String   @unique
+  company   Company  @relation(fields: [companyId], references: [id])
 
-  createdAt     DateTime @default(now())
+  startedAt DateTime
+  endsAt    DateTime?
+
+  createdAt DateTime @default(now())
 }
 
-/* =====================================================
-   КЛИЕНТЫ
-   ===================================================== */
-model Client {
-  id            String   @id @default(uuid())
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id])
+/* =======================
+   PRODUCTS + BARCODE / QR
+======================= */
 
-  email         String?  @unique
-  phone         String?
-  name          String
-  passwordHash  String?
-
-  autoTags      String[]
-  internalTag   String?
-  createdByAdmin Boolean @default(false)
-
-  orders        Order[]
-
-  createdAt     DateTime @default(now())
-}
-
-/* =====================================================
-   ТОВАРЫ
-   ===================================================== */
 model Product {
-  id            String   @id @default(uuid())
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id])
+  id        String   @id @default(uuid())
+  name      String
+  article   String
+  price     Float
 
-  name          String
-  description   String?
-  price         Float
-  costPrice     Float?
+  barcode   String?
+  qrCode    String?
 
-  labels        String[]   // Маркетплейс-метки
-  isActive      Boolean @default(true)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
 
-  orderItems    OrderItem[]
-
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-/* =====================================================
-   ЗАКАЗЫ
-   ===================================================== */
+/* =======================
+   WAREHOUSES
+======================= */
+
+model Warehouse {
+  id        String   @id @default(uuid())
+  name      String
+  location  String?
+
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+
+  createdAt DateTime @default(now())
+}
+
+/* =======================
+   ORDERS + MARKETPLACES
+======================= */
+
 model Order {
-  id            String   @id @default(uuid())
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id])
+  id          String   @id @default(uuid())
+  number      String
+  status      String
 
-  clientId      String
-  client        Client   @relation(fields: [clientId], references: [id])
+  marketplace Json?
+  labelUrl    String?
 
-  status        String
-  totalPrice    Float
+  companyId   String
+  company     Company @relation(fields: [companyId], references: [id])
 
-  isVip         Boolean @default(false)
-
-  paidAt        DateTime?
-  completedAt   DateTime?
-
-  items         OrderItem[]
-
-  createdAt     DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
-/* =====================================================
-   ПОЗИЦИИ ЗАКАЗА
-   ===================================================== */
-model OrderItem {
-  id            String   @id @default(uuid())
-  orderId       String
-  order         Order    @relation(fields: [orderId], references: [id])
+/* =======================
+   AUDIT LOG
+======================= */
 
-  productId     String
-  product       Product  @relation(fields: [productId], references: [id])
+model AuditLog {
+  id        String   @id @default(uuid())
+  action    String
+  entity    String
+  entityId  String?
 
-  quantity      Int
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
 
-  productionStages ProductionStage[]
+  createdAt DateTime @default(now())
 }
 
-/* =====================================================
-   ПРОИЗВОДСТВЕННЫЕ ЭТАПЫ
-   ===================================================== */
-model ProductionStage {
-  id            String   @id @default(uuid())
+/* =======================
+   LANDINGS / CMS / MULTI
+======================= */
 
-  orderItemId   String
-  orderItem     OrderItem @relation(fields: [orderItemId], references: [id])
+model Landing {
+  id        String   @id @default(uuid())
+  key       String
+  language  String
+  content   Json
 
-  employeeId    String
-  employee      Employee  @relation(fields: [employeeId], references: [id])
+  companyId String?
+  company   Company? @relation(fields: [companyId], references: [id])
 
-  stageName     String
-  status        String
-
-  startedAt     DateTime?
-  completedAt   DateTime?
-}
-
-/* =====================================================
-   РАСХОДЫ
-   ===================================================== */
-model Expense {
-  id            String   @id @default(uuid())
-  companyId     String
-  company       Company  @relation(fields: [companyId], references: [id])
-
-  title         String
-  amount        Float
-  date          DateTime
-
-  createdAt     DateTime @default(now())
+  createdAt DateTime @default(now())
 }

@@ -4,33 +4,38 @@
  * ============================================
  */
 
-import { Injectable } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
-import { PrismaService } from '../prisma/prisma.service';
-import { Role } from './roles.enum';
+import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import { PrismaClient, Role } from '@prisma/client';
+import { JwtPayload } from './auth.types';
 
-@Injectable()
+const prisma = new PrismaClient();
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
+
 export class AuthService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
-  ) {}
+  static async login(email: string, password: string) {
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (!user) throw new Error('User not found');
 
-  async login(email: string, password: string) {
-    const user = await this.prisma.user.findUnique({ where: { email } });
-    if (!user || user.password !== password) {
-      return null;
-    }
+    const valid = await bcrypt.compare(password, user.password);
+    if (!valid) throw new Error('Invalid password');
 
-    const payload = {
-      id: user.id,
+    const payload: JwtPayload = {
+      userId: user.id,
+      role: user.role,
       companyId: user.companyId,
-      role: user.role as Role,
     };
 
-    return {
-      token: this.jwtService.sign(payload),
-      user: payload,
-    };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: '7d' });
+
+    return { token, user };
+  }
+
+  static verifyToken(token: string): JwtPayload {
+    return jwt.verify(token, JWT_SECRET) as JwtPayload;
+  }
+
+  static async hashPassword(password: string) {
+    return bcrypt.hash(password, 10);
   }
 }
