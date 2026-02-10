@@ -7,6 +7,8 @@
 import { useEffect, useState } from 'react';
 import { OrdersService } from '../services/orders.service';
 
+import { MarketplaceService } from '../services/marketplace.service';
+
 export default function OrdersPage() {
   const [orders, setOrders] = useState<any[]>([]);
 
@@ -43,6 +45,28 @@ export default function OrdersPage() {
                 ) : (
                   '—'
                 )}
+
+                /* внутри таблицы */
+
+<td>
+  {o.marketplace ? (
+    <button
+      onClick={async () => {
+        const label = await MarketplaceService.getLabel(
+          o.marketplace.type,
+          o.marketplace.orderId,
+        );
+        window.open(label.url);
+      }}
+    >
+      Этикетка
+    </button>
+  ) : o.isPickup ? (
+    <span>Самовывоз (QR)</span>
+  ) : (
+    '—'
+  )}
+</td>
               </td>
             </tr>
           ))}
