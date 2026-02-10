@@ -23,3 +23,14 @@ import { MaterialsModule } from '../materials/materials.module';
   exports: [ProductsService],
 })
 export class ProductsModule {}
+
+import { Module } from '@nestjs/common';
+import { ProductsController } from './products.controller';
+import { ProductsService } from './products.service';
+import { BarcodeService } from './barcode.service';
+
+@Module({
+  controllers: [ProductsController],
+  providers: [ProductsService, BarcodeService],
+})
+export class ProductsModule {}

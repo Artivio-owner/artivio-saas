@@ -209,3 +209,24 @@ export class ProductsService {
     return prisma.product.findMany({ where: { companyId } });
   }
 }
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export class ProductsService {
+  list(companyId: string) {
+    return prisma.product.findMany({
+      where: { companyId },
+    });
+  }
+
+  create(companyId: string, data: any) {
+    return prisma.product.create({
+      data: {
+        ...data,
+        companyId,
+      },
+    });
+  }
+}

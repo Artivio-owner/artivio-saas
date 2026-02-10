@@ -168,3 +168,71 @@ model Landing {
 
   @@unique([key, language])
 }
+
+model Company {
+  id        String   @id @default(uuid())
+  name      String
+  domain    String   @unique
+  createdAt DateTime @default(now())
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  role      UserRole
+  companyId String?
+}
+
+model Product {
+  id          String   @id @default(uuid())
+  companyId   String
+  name        String
+  article     String
+  price       Float
+  createdAt   DateTime @default(now())
+
+  @@unique([companyId, article])
+}
+
+model Marketplace {
+  id        String   @id @default(uuid())
+  code      String   @unique // ozon, wb, ym
+  name      String
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  companyId     String
+  marketplaceId String?
+  createdAt     DateTime @default(now())
+
+  marketplace   Marketplace? @relation(fields: [marketplaceId], references: [id])
+  items         OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId  String
+  productId String
+  quantity Int
+
+  product Product @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id            String   @id @default(uuid())
+  companyId     String
+  marketplaceId String?
+  selfPickup    Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  marketplace   Marketplace? @relation(fields: [marketplaceId], references: [id])
+  items         OrderItem[]
+}

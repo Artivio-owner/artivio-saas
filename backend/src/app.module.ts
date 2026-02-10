@@ -38,6 +38,26 @@ import { NotificationsModule } from './notifications/notifications.module';
  */
 import { SaasModule } from './saas/saas.module';
 
+import { ProductsModule } from './products/products.module';
+import { MarketplacesModule } from './marketplaces/marketplaces.module';
+
+@Module({
+  imports: [
+    ProductsModule,
+    MarketplacesModule,
+  ],
+})
+export class AppModule {}
+
+import { OrdersModule } from './orders/orders.module';
+
+@Module({
+  imports: [
+    OrdersModule,
+  ],
+})
+export class AppModule {}
+
 @Module({
   imports: [
     /**

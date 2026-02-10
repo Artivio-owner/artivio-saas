@@ -16,3 +16,14 @@ import { PrismaService } from '../prisma/prisma.service';
   exports: [SaasService],
 })
 export class SaasModule {}
+
+/**
+ * ============================================
+ * SAAS MODULE
+ * ============================================
+ */
+
+import { Module } from '@nestjs/common';
+
+@Module({})
+export class SaaSModule {}

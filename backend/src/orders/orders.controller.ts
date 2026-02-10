@@ -61,3 +61,21 @@ export class OrdersController {
     res.json(order);
   }
 }
+
+import { Controller, Get, Post, Body, Req } from '@nestjs/common';
+import { OrdersService } from './orders.service';
+
+@Controller('orders')
+export class OrdersController {
+  constructor(private readonly service: OrdersService) {}
+
+  @Get()
+  list(@Req() req) {
+    return this.service.list(req.saas.company.id);
+  }
+
+  @Post()
+  create(@Req() req, @Body() body) {
+    return this.service.create(req.saas.company.id, body);
+  }
+}

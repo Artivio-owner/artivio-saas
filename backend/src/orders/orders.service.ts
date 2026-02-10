@@ -124,3 +124,34 @@ export class OrdersService {
     return prisma.order.findMany({ where: { companyId } });
   }
 }
+
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
+
+export class OrdersService {
+  list(companyId: string) {
+    return prisma.order.findMany({
+      where: { companyId },
+      include: {
+        items: {
+          include: { product: true },
+        },
+        marketplace: true,
+      },
+    });
+  }
+
+  create(companyId: string, data: any) {
+    return prisma.order.create({
+      data: {
+        companyId,
+        marketplaceId: data.marketplaceId || null,
+        selfPickup: !data.marketplaceId,
+        items: {
+          create: data.items,
+        },
+      },
+    });
+  }
+}

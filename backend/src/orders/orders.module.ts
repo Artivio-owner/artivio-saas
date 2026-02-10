@@ -16,3 +16,14 @@ import { WarehousesModule } from '../warehouses/warehouses.module';
   providers: [OrdersService, PrismaService],
 })
 export class OrdersModule {}
+
+import { Module } from '@nestjs/common';
+import { OrdersController } from './orders.controller';
+import { OrdersService } from './orders.service';
+import { LabelsService } from './labels.service';
+
+@Module({
+  controllers: [OrdersController],
+  providers: [OrdersService, LabelsService],
+})
+export class OrdersModule {}

@@ -48,3 +48,19 @@ export interface SaaSRequestContext {
   company: Company | null;
   isPlatform: boolean; // artivio.ru
 }
+
+/**
+ * ============================================
+ * SAAS TYPES (CANON)
+ * ============================================
+ */
+
+export type SaaSProduct = 'furnicore' | 'furnislicer';
+
+export interface SaaSTenant {
+  id: string;
+  companyId: string | null;
+  domain: string;
+  product: SaaSProduct;
+  isWhiteLabel: boolean;
+}

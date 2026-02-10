@@ -124,3 +124,21 @@ export class ProductsController {
     };
   }
 }
+
+import { Controller, Get, Post, Body, Req } from '@nestjs/common';
+import { ProductsService } from './products.service';
+
+@Controller('products')
+export class ProductsController {
+  constructor(private readonly service: ProductsService) {}
+
+  @Get()
+  list(@Req() req) {
+    return this.service.list(req.saas.company.id);
+  }
+
+  @Post()
+  create(@Req() req, @Body() body) {
+    return this.service.create(req.saas.company.id, body);
+  }
+}

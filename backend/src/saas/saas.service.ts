@@ -105,3 +105,58 @@ export class SaaSService {
     return { company, isPlatform: false };
   }
 }
+/**
+ * ============================================
+ * SAAS SERVICE
+ * ============================================
+ */
+
+import { PrismaClient } from '@prisma/client';
+import { SaaSTenant } from './saas.types';
+
+const prisma = new PrismaClient();
+
+export class SaaSService {
+  static async resolveTenant(host: string): Promise<SaaSTenant> {
+    // 1️⃣ FurniCore
+    if (host.startsWith('furnicore.')) {
+      return {
+        id: 'furnicore',
+        companyId: null,
+        domain: host,
+        product: 'furnicore',
+        isWhiteLabel: false,
+      };
+    }
+
+    // 2️⃣ FurniSlicer
+    if (host.startsWith('furnislicer.')) {
+      return {
+        id: 'furnislicer',
+        companyId: null,
+        domain: host,
+        product: 'furnislicer',
+        isWhiteLabel: false,
+      };
+    }
+
+    // 3️⃣ White-label client domain
+    const company = await prisma.company.findFirst({
+      where: {
+        domain: host,
+      },
+    });
+
+    if (!company) {
+      throw new Error(`Tenant not found for domain: ${host}`);
+    }
+
+    return {
+      id: company.id,
+      companyId: company.id,
+      domain: host,
+      product: 'furnicore', // по умолчанию
+      isWhiteLabel: true,
+    };
+  }
+}
