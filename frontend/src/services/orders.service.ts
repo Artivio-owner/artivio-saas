@@ -8,7 +8,7 @@ import { api } from './api';
 
 export const OrdersService = {
   list() {
-    return api.get('/orders').then((r) => r.data);
+    return api.get('/orders');
   },
 
   create(data: {

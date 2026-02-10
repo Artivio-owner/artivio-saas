@@ -14,6 +14,56 @@ import { AdminLayout } from '../layouts/AdminLayout';
 
 import LandingPage from '../landing/LandingPage';
 
+import { createBrowserRouter } from 'react-router-dom';
+import { AuthGuard } from './guards';
+
+import LoginPage from '../pages/auth/LoginPage';
+import DashboardPage from '../pages/cabinet/DashboardPage';
+import ProductsPage from '../pages/cabinet/ProductsPage';
+import OrdersPage from '../pages/cabinet/OrdersPage';
+
+import FurniCoreLanding from '../landings/FurniCoreLanding';
+import FurniSlicerLanding from '../landings/FurniSlicerLanding';
+import { getTenant } from '../utils/tenant.util';
+
+const tenant = getTenant();
+
+if (tenant === 'furnicore') {
+  routes.unshift({ path: '/', element: <FurniCoreLanding /> });
+}
+
+if (tenant === 'furnislicer') {
+  routes.unshift({ path: '/', element: <FurniSlicerLanding /> });
+}
+
+export const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
+  {
+    path: '/',
+    element: (
+      <AuthGuard>
+        <DashboardPage />
+      </AuthGuard>
+    ),
+  },
+  {
+    path: '/products',
+    element: (
+      <AuthGuard>
+        <ProductsPage />
+      </AuthGuard>
+    ),
+  },
+  {
+    path: '/orders',
+    element: (
+      <AuthGuard>
+        <OrdersPage />
+      </AuthGuard>
+    ),
+  },
+]);
+
 /* … */
 
 <Route path="/" element={<LandingPage />} />

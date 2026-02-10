@@ -158,3 +158,13 @@ model Landing {
 
   createdAt DateTime @default(now())
 }
+
+model Landing {
+  id        String   @id @default(uuid())
+  key       String
+  language  String
+  content   Json
+  companyId String?
+
+  @@unique([key, language])
+}

@@ -1,7 +1,9 @@
 {
   "name": "Artivio Cabinet",
   "short_name": "Artivio",
+  "description": "Artivio SaaS Cabinet",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#111827",

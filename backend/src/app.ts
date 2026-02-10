@@ -10,3 +10,4 @@ app.use('/auth', authRoutes);
 app.use('/admin', adminRoutes);
 app.use('/products', productRoutes);
 app.use('/orders', orderRoutes);
+app.use(express.static('frontend/public'));
