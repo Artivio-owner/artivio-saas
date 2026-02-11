@@ -3,19 +3,14 @@
  * ARTIVIO — AUTH SERVICE
  * ============================================
  */
-
 import { api } from './api';
 
 export const AuthService = {
-  async login(email: string, password: string) {
-    const { data } = await api.post('/auth/login', { email, password });
-    localStorage.setItem('token', data.token);
-    return data.user;
+  login(email: string, password: string) {
+    return api.post('/auth/login', { email, password });
   },
-};
 
-  logout() {
-    localStorage.removeItem('auth_token');
-    window.location.reload();
+  me() {
+    return api.get('/auth/me');
   },
 };

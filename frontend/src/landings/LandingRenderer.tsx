@@ -16,3 +16,27 @@ export default function LandingRenderer() {
 
   return <div dangerouslySetInnerHTML={{ __html: content }} />;
 }
+
+import { LandingBlock } from './landing.types';
+import HeroBlock from './blocks/HeroBlock';
+import FeaturesBlock from './blocks/FeaturesBlock';
+import CTAButtonBlock from './blocks/CTAButtonBlock';
+
+export default function LandingRenderer({ blocks }: { blocks: LandingBlock[] }) {
+  return (
+    <>
+      {blocks.map((block, i) => {
+        switch (block.type) {
+          case 'hero':
+            return <HeroBlock key={i} {...block} />;
+          case 'features':
+            return <FeaturesBlock key={i} {...block} />;
+          case 'cta':
+            return <CTAButtonBlock key={i} {...block} />;
+          default:
+            return null;
+        }
+      })}
+    </>
+  );
+}

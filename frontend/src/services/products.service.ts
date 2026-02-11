@@ -4,6 +4,7 @@ export const ProductsService = {
   list() {
     return api.get('/products');
   },
+
   create(data: any) {
     return api.post('/products', data);
   },

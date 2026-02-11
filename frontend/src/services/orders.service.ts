@@ -11,6 +11,15 @@ export const OrdersService = {
     return api.get('/orders');
   },
 
+
+  create(data: any) {
+    return api.post('/orders', data);
+  },
+
+  getLabel(orderItemId: string) {
+    return api.get(`/orders/labels/${orderItemId}`);
+  },
+  
   create(data: {
     warehouseId: string;
     items: { materialId: string; quantity: number }[];

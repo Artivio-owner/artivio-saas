@@ -4,6 +4,16 @@
  * ============================================
  */
 
+import LandingPage from '../pages/LandingPage';
+
+export const router = createBrowserRouter([
+  { path: '/', element: <LandingPage /> },
+
+  // cabinet
+  { path: '/cabinet', element: <CabinetPage /> },
+  ...
+]);
+
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LoginPage from '../pages/LoginPage';
 import DashboardPage from '../pages/DashboardPage';
@@ -25,6 +35,21 @@ import OrdersPage from '../pages/cabinet/OrdersPage';
 import FurniCoreLanding from '../landings/FurniCoreLanding';
 import FurniSlicerLanding from '../landings/FurniSlicerLanding';
 import { getTenant } from '../utils/tenant.util';
+
+import { createBrowserRouter } from 'react-router-dom';
+import CabinetPage from '../pages/cabinet/CabinetPage';
+import AdminPage from '../pages/admin/AdminPage';
+
+export const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <CabinetPage />,
+  },
+  {
+    path: '/admin',
+    element: <AdminPage />,
+  },
+]);
 
 const tenant = getTenant();
 
@@ -115,3 +140,23 @@ export function AppRouter() {
     </BrowserRouter>
   );
 }
+
+import { createBrowserRouter } from 'react-router-dom';
+
+import CabinetPage from '../pages/cabinet/CabinetPage';
+import ProductsPage from '../pages/cabinet/ProductsPage';
+import OrdersPage from '../pages/cabinet/OrdersPage';
+
+import AdminPage from '../pages/admin/AdminPage';
+import CompaniesPage from '../pages/admin/CompaniesPage';
+import LandingsPage from '../pages/admin/LandingsPage';
+
+export const router = createBrowserRouter([
+  { path: '/', element: <CabinetPage /> },
+  { path: '/products', element: <ProductsPage /> },
+  { path: '/orders', element: <OrdersPage /> },
+
+  { path: '/admin', element: <AdminPage /> },
+  { path: '/admin/companies', element: <CompaniesPage /> },
+  { path: '/admin/landings', element: <LandingsPage /> },
+]);
